@@ -189,7 +189,7 @@ func getValueForMetric(metric string, instance string, stat string) float64 {
 		}
 	}
 	if *debug {
-		////log.Println("No result found for metric", metric, "on instance", instance)
+		log.Println("No result found for metric", metric, "on instance", instance)
 	}
 
 	return -1.0
@@ -204,8 +204,8 @@ var (
 
     statistics = []string {
     	"Average",
- //   	"Minimum",
- //   	"Maximum",
+    	"Minimum",
+    	"Maximum",
     }
 )
 
@@ -228,7 +228,7 @@ func getMetrics(regions []string, stats []string) {
     				if metric_val == -1.0 {
 
     					if *debug {
-    						////log.Println("Retrying metric", metric)
+    						log.Println("Retrying metric", metric)
     					}
     					metric_val = getValueForMetric(metric, instance.Name, statistic)
     				}
