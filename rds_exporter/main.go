@@ -1,3 +1,6 @@
+// AWS/RDS Prometheus Exporter written in golang
+// Written by Alex Conrey - 2018
+
 package main
 
 import (
