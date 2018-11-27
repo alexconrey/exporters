@@ -9,9 +9,11 @@ import (
     "github.com/aws/aws-sdk-go/aws/session"
     "github.com/aws/aws-sdk-go/service/cloudwatch"
     "github.com/aws/aws-sdk-go/service/rds"
+    "github.com/aws/aws-sdk-go/aws/credentials" 
     "flag"
     "fmt"
     "log"
+    "os"
     "time"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -46,10 +48,21 @@ type PrometheusGauge struct {
 	Gauge *prometheus.GaugeVec
 }
 
+func getAWSCredsFromFile(filename string) *credentials.Credentials {
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		log.Fatal("Could not find auth file ", filename)
+	}
+	return credentials.NewSharedCredentials(filename, "default")
+}
+
+var aws_creds *credentials.Credentials 
+
 func getInstancesForRegion(region string) []RDSInstance {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		Config: aws.Config{Region: aws.String(region)},
-		SharedConfigState: session.SharedConfigEnable,
+		Config: aws.Config{
+			Region: aws.String(region),
+			Credentials: aws_creds,
+		},
 	}))
 
 	svc := rds.New(sess)
@@ -92,8 +105,10 @@ func getInstancesForRegion(region string) []RDSInstance {
 
 func getMetricsForInstance(instance string, region string) []string {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		Config: aws.Config{Region: aws.String(region)},
-		SharedConfigState: session.SharedConfigEnable,
+		Config: aws.Config{
+			Region: aws.String(region),
+			Credentials: aws_creds,
+		},
 	}))
 
 	svc := cloudwatch.New(sess)
@@ -159,8 +174,10 @@ func getMetricsForInstance(instance string, region string) []string {
 
 func getValueForMetric(metric string, instance string, region string, stat string) float64 {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		Config: aws.Config{Region: aws.String(region)},
-		SharedConfigState: session.SharedConfigEnable,
+		Config: aws.Config{
+			Region: aws.String(region),
+			Credentials: aws_creds,
+		},
 	}))
 
 	svc := cloudwatch.New(sess)
@@ -228,6 +245,7 @@ var (
 // Define flags here
 var (
 	listen_addr = flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
+	credential_file = flag.String("aws.creds", "/root/.aws/credentials", "Path to AWS credential file")
 	aws_regions = flag.String("regions", "us-east-1,us-east-2,ca-central-1", "List of regions")
 	interval = flag.Int("interval", 30, "The interval (in seconds) to wait between stats queries")
 	environment = flag.String("env", "dev", "The environment to filter")
@@ -275,6 +293,10 @@ func main() {
 	log.Println("Starting...")
 	flag.Parse()
 	regions := strings.Split(*aws_regions, ",")
+
+	// Dereference credential_file as a pointer
+	credential_file := *credential_file
+	aws_creds = getAWSCredsFromFile(credential_file)
 
 	// Run getMetricsForInstance on first available instance only to initialize gauges
 	oneRegion := []string{
