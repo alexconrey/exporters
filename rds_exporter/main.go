@@ -1,5 +1,6 @@
 // AWS/RDS Prometheus Exporter written in golang
-// Written by Alex Conrey - 2018
+// `go get github.com/alexconrey/exporters/rds_exporter`
+// `go build github.com/alexconrey/exporters/rds_exporter`
 
 package main
 
@@ -244,7 +245,7 @@ var (
 
 // Define flags here
 var (
-	listen_addr = flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
+	listen_addr = flag.String("listen.address", ":8080", "The address to listen on for HTTP requests.")
 	credential_file = flag.String("aws.creds", "/root/.aws/credentials", "Path to AWS credential file")
 	aws_regions = flag.String("regions", "us-east-1,us-east-2,ca-central-1", "List of regions")
 	interval = flag.Int("interval", 30, "The interval (in seconds) to wait between stats queries")
