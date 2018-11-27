@@ -47,9 +47,12 @@ type PrometheusGauge struct {
 }
 
 func getInstancesForRegion(region string) []RDSInstance {
-	svc := rds.New(session.New(&aws.Config{
-		Region: aws.String(region),
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
+		Config: aws.Config{Region: aws.String(region)},
+		SharedConfigState: session.SharedConfigEnable,
 	}))
+
+	svc := rds.New(sess)
 
 	input := &rds.DescribeDBInstancesInput{}
 
