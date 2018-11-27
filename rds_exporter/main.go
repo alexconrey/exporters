@@ -14,6 +14,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 	"strings"
+	"regexp"
 )
 
 var (
@@ -66,7 +67,14 @@ func getInstancesForRegion(region string) []RDSInstance {
 
 	var instances []RDSInstance
 
+	// filter against instancees in specified environment
+	env_regexp := fmt.Sprintf("^.*%s.*$", *environment)
+	var isEnv = regexp.MustCompile(env_regexp)
+
 	for _, instance := range result.DBInstances {
+		if ! isEnv.MatchString(*instance.DBInstanceIdentifier) {
+			continue
+		}
 		ins := RDSInstance{
 			Name: *instance.DBInstanceIdentifier,
 		}
@@ -143,8 +151,9 @@ func getMetricsForInstance(instance string, region string) []string {
 
 }
 
-func getValueForMetric(metric string, instance string, stat string) float64 {
+func getValueForMetric(metric string, instance string, region string, stat string) float64 {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
+		Config: aws.Config{Region: aws.String(region)},
 		SharedConfigState: session.SharedConfigEnable,
 	}))
 
@@ -215,6 +224,7 @@ var (
 	listen_addr = flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
 	aws_regions = flag.String("regions", "us-east-1,us-east-2,ca-central-1", "List of regions")
 	interval = flag.Int("interval", 30, "The interval (in seconds) to wait between stats queries")
+	environment = flag.String("env", "dev", "The environment to filter")
 	debug = flag.Bool("debug", false, "Set this to enable debug mode")
 )
 
@@ -223,17 +233,20 @@ func getMetrics(regions []string, stats []string) {
     	for _, instance := range getInstancesForRegion(region) {
     		for _, metric := range getMetricsForInstance(instance.Name, region) {
     			for _, statistic := range stats {
-    				metric_val := getValueForMetric(metric, instance.Name, statistic)
-    				// Retry if metric_val is -1 (error)
+    				metric_val := getValueForMetric(metric, instance.Name, region, statistic)
+    				// if metric is -1, skip and retry next round
     				if metric_val == -1.0 {
-
     					if *debug {
-    						log.Println("Retrying metric", metric)
+    						log.Println("Value error: -1 on metric", metric, "..skipping")
     					}
-    					metric_val = getValueForMetric(metric, instance.Name, statistic)
+    					continue
     				}
+
 	    			// Iterate thru gauges until we find one matching this metric
     				for _, gauge := range gauges {
+    					if gauge.Name != metric { 
+    						continue
+    					}
     					gauge.Gauge.With(prometheus.Labels{
     						"instance": instance.Name,
     						"region_name": region,
